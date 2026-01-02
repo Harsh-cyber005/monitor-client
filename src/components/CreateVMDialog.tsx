@@ -132,10 +132,43 @@ export function CreateVMDialog() {
     };
 
     const copyToClipboard = () => {
-        if (setupData?.command) {
-            navigator.clipboard.writeText(setupData.command);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+        if (!setupData?.command) return;
+
+        const textToCopy = setupData.command;
+
+        // 1. Try modern API (works on HTTPS/localhost)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                })
+                .catch((err) => console.error("Clipboard API failed:", err));
+        } else {
+            // 2. Fallback for HTTP (Industry Standard Workaround)
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+
+                // Ensure textarea is not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+
+                textArea.focus();
+                textArea.select();
+
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                }
+                document.body.removeChild(textArea);
+            } catch (err) {
+                console.error("Fallback copy failed:", err);
+                alert("Please copy manually - Browser blocked clipboard access.");
+            }
         }
     };
 
