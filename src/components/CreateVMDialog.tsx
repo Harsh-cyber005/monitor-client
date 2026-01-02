@@ -136,39 +136,52 @@ export function CreateVMDialog() {
 
         const textToCopy = setupData.command;
 
-        // 1. Try modern API (works on HTTPS/localhost)
-        if (navigator.clipboard && navigator.clipboard.writeText) {
+        // 1. Pehle Modern API try karo (Best for Localhost/HTTPS)
+        if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy)
                 .then(() => {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                 })
-                .catch((err) => console.error("Clipboard API failed:", err));
+                .catch(() => {
+                    // Agar modern API fail ho jaye (jaise HTTP par), toh fallback par jao
+                    fallbackCopy(textToCopy);
+                });
         } else {
-            // 2. Fallback for HTTP (Industry Standard Workaround)
-            try {
-                const textArea = document.createElement("textarea");
-                textArea.value = textToCopy;
+            // 2. Direct Fallback for HTTP IP addresses
+            fallbackCopy(textToCopy);
+        }
+    };
 
-                // Ensure textarea is not visible but part of DOM
-                textArea.style.position = "fixed";
-                textArea.style.left = "-9999px";
-                textArea.style.top = "0";
-                document.body.appendChild(textArea);
+    // Separate function for cleaner logic
+    const fallbackCopy = (text: string) => {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
 
-                textArea.focus();
-                textArea.select();
+            // Isse UI kharab nahi hoga par browser ko lagega text visible hai
+            textArea.style.position = "fixed";
+            textArea.style.left = "0";
+            textArea.style.top = "0";
+            textArea.style.opacity = "0";
+            textArea.style.pointerEvents = "none";
 
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                }
-                document.body.removeChild(textArea);
-            } catch (err) {
-                console.error("Fallback copy failed:", err);
-                alert("Please copy manually - Browser blocked clipboard access.");
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+
+            if (successful) {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                throw new Error("ExecCommand failed");
             }
+        } catch (err) {
+            console.error("All copy methods failed:", err);
+            alert("Browser blocked auto-copy. Please select and copy the text manually.");
         }
     };
 
