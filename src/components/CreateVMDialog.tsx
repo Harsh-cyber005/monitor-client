@@ -96,11 +96,8 @@ export function CreateVMDialog() {
     // CreateVMDialog.tsx ke andar ye functions replace karein
 
     const fallbackCopy = (text: string) => {
-        console.log("Attempting fallback copy for HTTP...");
         const textarea = document.createElement("textarea");
         textarea.value = text;
-
-        // satisfies browser: must be in DOM and "visible-ish"
         textarea.style.position = "fixed";
         textarea.style.left = "10px";
         textarea.style.top = "10px";
@@ -112,7 +109,6 @@ export function CreateVMDialog() {
         textarea.focus();
         textarea.select();
 
-        // Required for some mobile/older browsers
         textarea.setSelectionRange(0, 99999);
 
         try {
@@ -120,23 +116,13 @@ export function CreateVMDialog() {
             document.body.removeChild(textarea);
 
             if (successful) {
-                console.log("Fallback: document.execCommand reported success");
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
-
-                // --- THE CRITICAL FIX ---
-                // Hum ek alert de sakte hain confirm karne ke liye
-                // Taaki user ko pata chale clipboard update hua ya nahi
             } else {
                 throw new Error("ExecCommand returned false");
             }
         } catch (err) {
-            console.error("Fallback failed, using Prompt method...");
             document.body.removeChild(textarea);
-
-            // IF EVERYTHING FAILS: Use the manual prompt (100% Reliable on HTTP)
-            // Ye browser ka internal clipboard handler use karta hai
-            window.prompt("Browser blocked auto-copy. Press Ctrl+C or Cmd+C to copy:", text);
         }
     };
 
@@ -144,7 +130,6 @@ export function CreateVMDialog() {
         if (!setupData?.command) return;
 
         const textToCopy = setupData.command;
-        console.log("Copy Triggered. Protocol:", window.location.protocol);
 
         // HTTPS/Localhost: Use Modern API
         if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
