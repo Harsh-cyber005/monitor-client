@@ -93,75 +93,69 @@ export function CreateVMDialog() {
     }, [isOpen, setupData, isInstalled, refreshVMs, resetState]);
 
     // --- Copy Logic from your working snippet ---
-    // Inside CreateVMDialog.tsx
+    // CreateVMDialog.tsx ke andar ye functions replace karein
 
     const fallbackCopy = (text: string) => {
         console.log("Attempting fallback copy for HTTP...");
         const textarea = document.createElement("textarea");
         textarea.value = text;
 
-        // Position fixed and visible for a split second to satisfy browser security
+        // satisfies browser: must be in DOM and "visible-ish"
         textarea.style.position = "fixed";
-        textarea.style.left = "0";
-        textarea.style.top = "0";
-        textarea.style.width = "2em";
-        textarea.style.height = "2em";
-        textarea.style.padding = "0";
-        textarea.style.border = "none";
-        textarea.style.outline = "none";
-        textarea.style.boxShadow = "none";
-        textarea.style.background = "transparent";
+        textarea.style.left = "10px";
+        textarea.style.top = "10px";
+        textarea.style.width = "1px";
+        textarea.style.height = "1px";
+        textarea.style.opacity = "0.01";
 
         document.body.appendChild(textarea);
         textarea.focus();
         textarea.select();
 
-        // Explicit selection range for mobile/older browsers
+        // Required for some mobile/older browsers
         textarea.setSelectionRange(0, 99999);
 
         try {
             const successful = document.execCommand("copy");
+            document.body.removeChild(textarea);
+
             if (successful) {
-                console.log("Fallback: Copying text command was successful");
+                console.log("Fallback: document.execCommand reported success");
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
+
+                // --- THE CRITICAL FIX ---
+                // Hum ek alert de sakte hain confirm karne ke liye
+                // Taaki user ko pata chale clipboard update hua ya nahi
             } else {
-                console.error("Fallback: Copying text command was unsuccessful");
-                alert("Manual Copy Required: Browser blocked automatic clipboard access.");
+                throw new Error("ExecCommand returned false");
             }
         } catch (err) {
-            console.error("Fallback: Unable to copy", err);
-            alert("Error: " + err);
-        }
+            console.error("Fallback failed, using Prompt method...");
+            document.body.removeChild(textarea);
 
-        document.body.removeChild(textarea);
+            // IF EVERYTHING FAILS: Use the manual prompt (100% Reliable on HTTP)
+            // Ye browser ka internal clipboard handler use karta hai
+            window.prompt("Browser blocked auto-copy. Press Ctrl+C or Cmd+C to copy:", text);
+        }
     };
 
     const copyToClipboard = () => {
-        if (!setupData?.command) {
-            console.error("No command data found to copy");
-            return;
-        }
+        if (!setupData?.command) return;
 
         const textToCopy = setupData.command;
-        console.log("Copy button clicked. Protocol:", window.location.protocol);
+        console.log("Copy Triggered. Protocol:", window.location.protocol);
 
-        // Method 1: Modern API (Works on localhost/HTTPS)
-        if (window.isSecureContext && navigator.clipboard) {
-            console.log("Using Navigator Clipboard API...");
+        // HTTPS/Localhost: Use Modern API
+        if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textToCopy)
                 .then(() => {
-                    console.log("Clipboard API success");
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                 })
-                .catch((err) => {
-                    console.warn("Clipboard API failed, trying fallback...", err);
-                    fallbackCopy(textToCopy);
-                });
+                .catch(() => fallbackCopy(textToCopy));
         } else {
-            // Method 2: Fallback for HTTP IP
-            console.log("Insecure context detected. Using fallback method...");
+            // HTTP/IP: Use Fallback + Prompt Backup
             fallbackCopy(textToCopy);
         }
     };
