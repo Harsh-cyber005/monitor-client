@@ -93,34 +93,75 @@ export function CreateVMDialog() {
     }, [isOpen, setupData, isInstalled, refreshVMs, resetState]);
 
     // --- Copy Logic from your working snippet ---
+    // Inside CreateVMDialog.tsx
+
     const fallbackCopy = (text: string) => {
+        console.log("Attempting fallback copy for HTTP...");
         const textarea = document.createElement("textarea");
         textarea.value = text;
+
+        // Position fixed and visible for a split second to satisfy browser security
+        textarea.style.position = "fixed";
+        textarea.style.left = "0";
+        textarea.style.top = "0";
+        textarea.style.width = "2em";
+        textarea.style.height = "2em";
+        textarea.style.padding = "0";
+        textarea.style.border = "none";
+        textarea.style.outline = "none";
+        textarea.style.boxShadow = "none";
+        textarea.style.background = "transparent";
+
         document.body.appendChild(textarea);
+        textarea.focus();
         textarea.select();
+
+        // Explicit selection range for mobile/older browsers
+        textarea.setSelectionRange(0, 99999);
+
         try {
-            document.execCommand("copy");
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            const successful = document.execCommand("copy");
+            if (successful) {
+                console.log("Fallback: Copying text command was successful");
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                console.error("Fallback: Copying text command was unsuccessful");
+                alert("Manual Copy Required: Browser blocked automatic clipboard access.");
+            }
         } catch (err) {
-            console.error("Fallback copy failed", err);
+            console.error("Fallback: Unable to copy", err);
+            alert("Error: " + err);
         }
+
         document.body.removeChild(textarea);
     };
 
     const copyToClipboard = () => {
-        if (!setupData?.command) return;
+        if (!setupData?.command) {
+            console.error("No command data found to copy");
+            return;
+        }
 
         const textToCopy = setupData.command;
+        console.log("Copy button clicked. Protocol:", window.location.protocol);
 
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            }).catch(() => {
-                fallbackCopy(textToCopy);
-            });
+        // Method 1: Modern API (Works on localhost/HTTPS)
+        if (window.isSecureContext && navigator.clipboard) {
+            console.log("Using Navigator Clipboard API...");
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    console.log("Clipboard API success");
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                })
+                .catch((err) => {
+                    console.warn("Clipboard API failed, trying fallback...", err);
+                    fallbackCopy(textToCopy);
+                });
         } else {
+            // Method 2: Fallback for HTTP IP
+            console.log("Insecure context detected. Using fallback method...");
             fallbackCopy(textToCopy);
         }
     };
