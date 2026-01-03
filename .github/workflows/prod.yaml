@@ -1,0 +1,33 @@
+name: deploy to prod cluster
+on:
+  push:
+    branches:
+      - "master"
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH Key
+        run: |
+          echo "${{ secrets.HARSHMAX_PEM }}" > ~/harshmax.pem
+          chmod 600 ~/harshmax.pem
+
+      - name: Upload .env using Heredoc
+        run: |
+          ssh -i ~/harshmax.pem -o StrictHostKeyChecking=no ubuntu@${{ secrets.ASSH_SERVER_IP }} 'cat > /home/ubuntu/code/monitor-server/.env' << EOF
+          ${{ secrets.ENV }}
+          EOF
+
+      - name: Redeploy
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/harshmax.pem ubuntu@${{ secrets.ASSH_SERVER_IP }} << EOF
+            export NVM_DIR="\$HOME/.nvm"
+            [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
+            export PATH=\$PATH:/home/ubuntu/.npm-global/bin
+            cd /home/ubuntu/code/monitor-client
+            git pull origin master
+            pnpm install
+            pnpm run build
+            pm2 restart mnc
+          EOF
