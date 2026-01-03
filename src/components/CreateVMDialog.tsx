@@ -40,7 +40,7 @@ export function CreateVMDialog() {
         setError(null);
     }, []);
 
-    // --- 1. Persistence: Load existing setup from LocalStorage ---
+    // --- Persistence Check ---
     useEffect(() => {
         const saved = localStorage.getItem(LS_KEY);
         if (saved) {
@@ -56,7 +56,7 @@ export function CreateVMDialog() {
         }
     }, []);
 
-    // --- 2. Polling Logic: Immediate check on open + 5s interval ---
+    // --- Polling Logic ---
     useEffect(() => {
         let interval: NodeJS.Timeout;
 
@@ -66,17 +66,16 @@ export function CreateVMDialog() {
                 const res = await fetch(setupData.pollingLink);
                 const status = await res.json();
 
-                if (status === 1) { // 1 = Token Used
+                if (status === 1) { // Correct Usage
                     setIsInstalled(true);
                     refreshVMs();
                     localStorage.removeItem(LS_KEY);
 
-                    // Auto-close dialog after 3 seconds of success
                     setTimeout(() => {
                         setIsOpen(false);
                         setTimeout(resetState, 500);
                     }, 3000);
-                } else if (status < 0) { // Error states (-1: Not found, -2: Expired)
+                } else if (status < 0) {
                     setError(status === -2 ? "Installation token expired" : "Token no longer valid");
                     resetState();
                 }
@@ -85,17 +84,46 @@ export function CreateVMDialog() {
             }
         };
 
-        // Poll only if dialog is open, we have setup data, and not yet installed
         if (isOpen && setupData && !isInstalled) {
-            // 0th second: Trigger immediately upon opening/regaining state
             checkStatus();
-
-            // Then continue every 5 seconds
             interval = setInterval(checkStatus, 5000);
         }
 
         return () => clearInterval(interval);
     }, [isOpen, setupData, isInstalled, refreshVMs, resetState]);
+
+    // --- Copy Logic from your working snippet ---
+    const fallbackCopy = (text: string) => {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand("copy");
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Fallback copy failed", err);
+        }
+        document.body.removeChild(textarea);
+    };
+
+    const copyToClipboard = () => {
+        if (!setupData?.command) return;
+
+        const textToCopy = setupData.command;
+
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }).catch(() => {
+                fallbackCopy(textToCopy);
+            });
+        } else {
+            fallbackCopy(textToCopy);
+        }
+    };
 
     const handleCreate = async () => {
         if (!vmName.trim()) return;
@@ -115,9 +143,8 @@ export function CreateVMDialog() {
             }
 
             const data = await response.json();
-            setSetupData(data); // Includes command and pollingLink
+            setSetupData(data); //
 
-            // Save to LocalStorage for 12hr persistence
             localStorage.setItem(LS_KEY, JSON.stringify({
                 vmName,
                 setupData: data,
@@ -128,60 +155,6 @@ export function CreateVMDialog() {
             setError("Server unreachable. Try again later.");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const copyToClipboard = () => {
-        if (!setupData?.command) return;
-
-        const textToCopy = setupData.command;
-
-        // 1. Pehle Modern API try karo (Best for Localhost/HTTPS)
-        if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                })
-                .catch(() => {
-                    // Agar modern API fail ho jaye (jaise HTTP par), toh fallback par jao
-                    fallbackCopy(textToCopy);
-                });
-        } else {
-            // 2. Direct Fallback for HTTP IP addresses
-            fallbackCopy(textToCopy);
-        }
-    };
-
-    // Separate function for cleaner logic
-    const fallbackCopy = (text: string) => {
-        try {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-
-            // Isse UI kharab nahi hoga par browser ko lagega text visible hai
-            textArea.style.position = "fixed";
-            textArea.style.left = "0";
-            textArea.style.top = "0";
-            textArea.style.opacity = "0";
-            textArea.style.pointerEvents = "none";
-
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-
-            if (successful) {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            } else {
-                throw new Error("ExecCommand failed");
-            }
-        } catch (err) {
-            console.error("All copy methods failed:", err);
-            alert("Browser blocked auto-copy. Please select and copy the text manually.");
         }
     };
 
@@ -206,7 +179,6 @@ export function CreateVMDialog() {
                 </DialogHeader>
 
                 {isInstalled ? (
-                    /* --- SUCCESS STATE: Animated Tick --- */
                     <div className="py-12 flex flex-col items-center justify-center space-y-4 animate-in fade-in zoom-in duration-500">
                         <div className="h-20 w-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
                             <Check className="h-10 w-10 text-emerald-500 stroke-[3px] animate-in slide-in-from-bottom-2 duration-500" />
@@ -217,7 +189,6 @@ export function CreateVMDialog() {
                         </div>
                     </div>
                 ) : !setupData ? (
-                    /* --- INITIAL STATE: Input & Generate Button --- */
                     <div className="space-y-6 py-4">
                         <div className="space-y-2">
                             {error && (
@@ -243,7 +214,6 @@ export function CreateVMDialog() {
                         </Button>
                     </div>
                 ) : (
-                    /* --- POLLING STATE: Command & Status --- */
                     <div className="space-y-6 py-4 animate-in fade-in duration-500">
                         <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
